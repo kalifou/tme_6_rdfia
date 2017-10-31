@@ -8,39 +8,79 @@ Created on Wed Oct 25 16:08:16 2017
 # Chargement de la classe
 from tme6 import CirclesData
 from layer import *
-# import de la classe
-data = CirclesData()
+import torch
+import matplotlib.pyplot as plt
 
-# instancie la classe fournie
-# Acces aux donn ́ees
-Xtrain = data.Xtrain
-Ytrain = data.Ytrain
-# torch.Tensor contenant les entr ́ees du r ́eseau pour
-#l’apprentissage
 
-# affiche la taille des donn ́ees : torch.Size([200, 2])
-N = Xtrain.shape[0]
-# nombre d’exemples
-nx = Xtrain.shape[1]
-# dimensionalit ́e d’entr ́ee
-# donn ́ees disponibles : data.Xtrain, data.Ytrain, data.Xtest, data.Ytest,data.Xgrid
-ny = Ytrain.shape[1]
-# Fonctions d’affichage
-data.plot_data()
+if __name__ == '__main__':
 
-print "Nx : ",nx,"\nNy : ",ny
-params = init_params(nx,2,ny)
-# affiche les points de train et test
-Ygrid = forward(params, data.Xgrid)
-# calcul des predictions Y pour tous les points de la grille (forward et params non fournis, `a coder)
+    data = CirclesData()
 
-y = Ygrid['Y']
-print data.Xgrid.shape,y.shape,y
-data.plot_data_with_grid(y)
-# affichage des points et de la fronti`ere de d ́ecision gr^ace `a la grille
+    data.plot_data()
 
-#data.plot_loss(loss_train, loss_train, acc_train, acc_test)
-# affiche les courbes
-#de loss et accuracy en train et test. Les valeurs `a fournir sont des scalaires,
-#elles sont stock ́ees pour vous, il suffit de passer les nouvelles valeurs `a
-#chaque it ́eratio
+    # init
+    Xtrain = data.Xtrain
+    Ytrain = data.Ytrain
+    N = data.Xtrain.shape[0]
+    Nbatch = 16
+    nx = data.Xtrain.shape[1]
+    nh = 10
+    ny = data.Ytrain.shape[1]
+    params = init_params(nx, nh, ny)
+
+    curves = [[],[], [], []]
+
+    # epoch
+    Ltrains = []
+    Ltests = []
+    acctrains = []
+    acctests =[]
+    for iteration in range(900):
+
+        # batches
+        for j in range(N // Nbatch):
+            indsBatch = range(j * Nbatch, (j+1) * Nbatch)
+            X = Xtrain[indsBatch, :]
+            Y = Ytrain[indsBatch, :]
+            Yhat, outputs = forward(params, X)
+            L, _ = loss_accuracy(Yhat, Y)
+            grads = backward(params, outputs, Y)
+            params = sgd(params, grads, 0.02)
+
+        Yhat_train, _ = forward(params, data.Xtrain)
+        Yhat_test, _ = forward(params, data.Xtest)
+        Ltrain, acctrain = loss_accuracy(Yhat_train, data.Ytrain)
+        Ltest, acctest = loss_accuracy(Yhat_test, data.Ytest)
+        Ygrid, _ = forward(params, data.Xgrid)
+        
+        Ltrains.append(Ltrain)
+        Ltests.append(Ltest)
+        acctrains.append(acctrain)
+        acctests.append(acctest)
+        
+
+        #Use This for online plotting        
+        
+        #title = 'Iter {}: Acc train {:.1f}% ({:.2f}), acc test {:.1f}% ({:.2f})'.format(iteration, acctrain, Ltrain, acctest, Ltest)
+        #print(title)
+        #data.plot_data_with_grid(Ygrid, title)
+        #data.plot_loss(Ltrain, Ltest, acctrain, acctest)
+    
+    data.plot_data_with_grid(Ygrid)
+    plt.plot(Ltrains)
+    plt.plot(Ltests)
+    plt.ylabel('evolution of Loss during training')
+    plt.xlabel('training iteration number')
+    plt.savefig('loss.png')
+    plt.show()
+    plt.plot(acctrains)
+    plt.plot(acctests)
+    plt.xlabel('training iteration number')
+    plt.legend(['train accuracy', 'test accuracy'], loc='lower right')
+    plt.savefig('accuracy.png')
+    plt.ylabel('evolution of accuracy during training')
+    plt.show()
+    print 'max accuracy on test set: ' + str(max(acctests))
+    
+
+    print "done"
