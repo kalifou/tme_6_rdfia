@@ -34,23 +34,27 @@ def loss_accuracy(Ytil, Y, Y_onehot):
     _, indYhat = torch.max(Yhat, 1)
     _, indY = torch.max(Y_onehot, 1)
     acc = torch.sum(indY == indYhat).float() * 100. / float(indY.size(0));
-
     return L, acc
 
-def evaluation(model,N,X,Y):
+def evaluation(model,N,Xeval,Yeval):
     loss = 0
     acc = 0
-    for k in range(N // len(X)):
+    #Nbatch = 2048
+    for k in range(N // Nbatch):
+        
         indsBatch = range(k * Nbatch, (k+1) * Nbatch)
-        X = Variable(X[indsBatch, :], requires_grad=False)
-        Y = Variable(Y[indsBatch, :], requires_grad=False)
+        X = Variable(Xeval[indsBatch, :], requires_grad=False)
+        Y = Variable(Yeval[indsBatch, :], requires_grad=False)
+        
+        X,Y = X.cuda(), Y.cuda()
         
         Ytil = model(X)
         _, Y_not_onehot = Y.max(1)
         l, a = loss_accuracy(Ytil, Y_not_onehot, Y)
         loss += l
-        acc += a   
-    return loss.data.numpy() / float(k+1), acc.data.numpy() / float(k+1)
+        acc += a
+        print acc
+    return loss.cpu().data.numpy() / float(k+1), acc.cpu().data.numpy() / float(k+1)
 
 if __name__ == '__main__':
 
@@ -69,6 +73,7 @@ if __name__ == '__main__':
     ny = data.Ytrain.shape[1]
     
     model, loss, optim = init_model(nx, nh, ny, 0.001)
+    model.cuda()
     
     curves = [[],[], [], []]
 
@@ -78,7 +83,7 @@ if __name__ == '__main__':
     acctrains = []
     acctests =[]
     
-    graphic_step = 1024
+    graphic_step = 4096
     iteration = 0
     
     #shuffle training data
@@ -95,6 +100,8 @@ if __name__ == '__main__':
             X = Variable(Xtrain[indsBatch, :], requires_grad=False)
             Y = Variable(Ytrain[indsBatch, :], requires_grad=False)
             
+            X,Y = X.cuda(), Y.cuda()
+            
             Ytil = model(X)
             _, Y_not_onehot = Y.max(1)
             loss_train, acc_train = loss_accuracy(Ytil, Y_not_onehot, Y)
@@ -104,10 +111,9 @@ if __name__ == '__main__':
             optim.step()
             
             iteration += Nbatch
-             
+
             if iteration % graphic_step == 0:
                 model.eval()
-
                 loss_train, acc_train = evaluation(model, N, Xtrain, Ytrain)
                 acctrains.append(acc_train)
                 Ltrains.append(loss_train)
