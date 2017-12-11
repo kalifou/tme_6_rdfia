@@ -88,7 +88,7 @@ if __name__ == '__main__':
             Yhat, outs = forward(params, Variable(X, requires_grad=False))
             L, _ = loss_accuracy(Yhat, Variable(Y, requires_grad=False))
             L.backward()
-            params = sgd(params, 0.02)
+            params = sgd(params, 0.03)
        
 
         
@@ -117,13 +117,13 @@ if __name__ == '__main__':
     plt.plot(Ltests)
     plt.ylabel('evolution of Loss during training')
     plt.xlabel('training iteration number')
-    plt.savefig('loss.png')
+    plt.savefig('lossC2.png')
     plt.show()
     plt.plot(acctrains)
     plt.plot(acctests)
     plt.xlabel('training iteration number')
     plt.legend(['train accuracy', 'test accuracy'], loc='lower right')
-    plt.savefig('accuracy.png')
+    plt.savefig('accuracyC2.png')
     plt.ylabel('evolution of accuracy during training')
     plt.show()
     print 'max accuracy on test set: ' + str(max(acctests))

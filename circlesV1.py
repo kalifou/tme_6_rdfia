@@ -1,104 +1,131 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Oct 25 16:10:55 2017
-
-@author: kalifou
-"""
-import math as ma
-import torch as t
+import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from tme6 import CirclesData
 
-def init_params(nx,nh,ny):
-    mean = 0.0
-    std = 0.3 
-    theta_1 =  t.Tensor(nx,nh).normal_(mean,std)
-    theta_2 =  t.Tensor(nh,ny).normal_(mean,std)
-    
-    bias_1 =  t.Tensor(1,nh).normal_(mean,std) #?!
-    bias_2 =  t.Tensor(1,ny).normal_(mean,std) #?!
-    
-    return {'Wh':theta_1,'Wy':theta_2, 'bh':bias_1,'by':bias_2}
+def init_params(nx, nh, ny):
+    params = {}
+    params['Wh'] = torch.randn(nh, nx) * 0.3
+    params['bh'] = torch.zeros(nh, 1)
+    params['Wy'] = torch.randn(ny, nh) * 0.3
+    params['by'] = torch.zeros(ny, 1)
+    return params
 
-def softmax(x):
-    return t.exp(x)/t.sum(t.exp(x),0)
-    
 def forward(params, X):
-    """Inference on X"""
-    batch_size = X.shape[0]
-    
-    b_h =  params['bh']
-    n_h = b_h.shape[1]
-    
-    b_y =  params['by']
-    n_y = b_y.shape[1]
-    
-    H_tild = t.mm(X, params['Wh'])  + b_h.expand(batch_size,n_h) 
-    H =  t.tanh(H_tild)
-    Y_tild = t.mm(H, params['Wy']) + b_y.expand(batch_size,n_y)            
-    Y = softmax(Y_tild)
-    
-    outputs = {'X':X,'H_tild':H_tild, 'H':H, 'Y_tild':Y_tild, 'yhat':Y}   
+    bsize = X.size(0)
+    nh = params['Wh'].size(0)
+    ny = params['Wy'].size(0)
+    outputs = {}
+    outputs['X'] = X
+    outputs['htilde'] = torch.mm(X, params['Wh'].t()) + params['bh'].t().expand(bsize, nh)
+    outputs['h'] = torch.tanh(outputs['htilde'])
+    outputs['ytilde'] = torch.mm(outputs['h'], params['Wy'].t()) + params['by'].t().expand(bsize, ny)
+    outputs['yhat'] = torch.exp(outputs['ytilde'])
+    outputs['yhat'] = outputs['yhat'] / (outputs['yhat'].sum(1, keepdim=True)).expand_as(outputs['yhat'])
     return outputs['yhat'], outputs
 
 def loss_accuracy(Yhat, Y):
-    L = -t.sum(Y * t.log(Yhat))
-    
-    acc = 0
-    _, predInd = t.max(Yhat,1)
-    _, trueInd = t.max(Y,1)
-    nb_pred = t.sum(predInd == trueInd)
-    acc = float(nb_pred)*100 / trueInd.size(0)
+    L = - torch.mean(Y * torch.log(Yhat))
+
+    _, indYhat = torch.max(Yhat, 1)
+    _, indY = torch.max(Y, 1)
+
+    acc = torch.sum(indY == indYhat) * 100. / indY.size(0);
 
     return L, acc
 
 def backward(params, outputs, Y):
+    bsize = Y.shape[0]
     grads = {}
+    deltay = outputs['yhat'] - Y
+    grads['Wy'] = torch.mm(deltay.t(), outputs['h'])
+    grads['by'] = deltay.sum(0, keepdim=True).t()
+    deltah = torch.mm(deltay, params['Wy']) * (1 - torch.pow(outputs['h'], 2))
+    grads['Wh'] = torch.mm(deltah.t(), outputs['X'])
+    grads['bh'] = deltah.sum(0, keepdim=True).t()
 
-    # TODO remplir"Wy" avec les paramètres Wy, Wh, by, bh
-    # grads["Wy"] = ...
-    grads = dict()
-    grads['Y_tild'] = outputs['yhat'] - Y
-    grads['Wy'] = grads['Y_tild'].t().mm(outputs['H'])
-    grads['by'] = t.sum(grads['Y_tild'],0)
-    print grads['Y_tild'].shape, params['Wy'].shape, outputs['H'].shape
-    
-    
-    inter_grad = grads['Y_tild'].mm(params['Wy'].t() )
-    grads['H_tild'] = inter_grad.mul(1-outputs['H'].pow(2) )
+    grads['Wy'] /= bsize
+    grads['by'] /= bsize
+    grads['Wh'] /= bsize
+    grads['bh'] /= bsize
 
-    grads['Wh'] = grads['H_tild'].t().mm(outputs['H']) 
-    grads['bh'] = t.sum(grads['H_tild'],0) #No transpose ?!
     return grads
 
 def sgd(params, grads, eta):
-    # TODO mettre à jour le contenu de params
-    
+    params['Wy'] -= eta * grads['Wy']
+    params['Wh'] -= eta * grads['Wh']
+    params['by'] -= eta * grads['by']
+    params['bh'] -= eta * grads['bh']
+
     return params
 
 
 
 if __name__ == '__main__':
 
-    # init
     data = CirclesData()
+
     data.plot_data()
+
+    # init
     N = data.Xtrain.shape[0]
-    Nbatch = 10
+    Nbatch = 16
     nx = data.Xtrain.shape[1]
     nh = 10
     ny = data.Ytrain.shape[1]
-    eta = 0.03
-
-    # Premiers tests, code à modifier
     params = init_params(nx, nh, ny)
-    Yhat, outputs = forward(params, data.Xtrain)
-    L, _ = loss_accuracy(Yhat, data.Ytrain)
-    grads = backward(params, outputs, data.Ytrain)
-    params = sgd(params, grads, eta)
 
-    # TODO apprentissage
+    curves = [[],[], [], []]
 
-    # attendre un appui sur une touche pour garder les figures
-    input("done")
+    # epoch
+    Ltrains = []
+    Ltests = []
+    acctrains = []
+    acctests =[]
+    for iteration in range(900):
+
+        perm = np.random.permutation(N)
+        Xtrain = data.Xtrain[perm, :]
+        Ytrain = data.Ytrain[perm, :]
+
+        # batches
+        for j in range(N // Nbatch):
+            indsBatch = range(j * Nbatch, (j+1) * Nbatch)
+            X = Xtrain[indsBatch, :]
+            Y = Ytrain[indsBatch, :]
+            Yhat, outputs = forward(params, X)
+            L, _ = loss_accuracy(Yhat, Y)
+            grads = backward(params, outputs, Y)
+            params = sgd(params, grads, 0.03)
+
+        Yhat_train, _ = forward(params, data.Xtrain)
+        Yhat_test, _ = forward(params, data.Xtest)
+        Ltrain, acctrain = loss_accuracy(Yhat_train, data.Ytrain)
+        Ltest, acctest = loss_accuracy(Yhat_test, data.Ytest)
+        Ygrid, _ = forward(params, data.Xgrid)
+        
+        Ltrains.append(Ltrain)
+        Ltests.append(Ltest)
+        acctrains.append(acctrain)
+        acctests.append(acctest)
+
+        #title = 'Iter {}: Acc train {:.1f}% ({:.2f}), acc test {:.1f}% ({:.2f})'.format(iteration, acctrain, Ltrain, acctest, Ltest)
+        #print(title)
+        #data.plot_data_with_grid(Ygrid, title)
+        #data.plot_loss(Ltrain, Ltest, acctrain, acctest)
+    
+    plt.plot(Ltrains)
+    plt.plot(Ltests)
+    plt.ylabel('evolution of Loss during training')
+    plt.xlabel('training iteration number')
+    plt.savefig('lossC1.png')
+    plt.show()
+    plt.plot(acctrains)
+    plt.plot(acctests)
+    plt.xlabel('training iteration number')
+    plt.legend(['train accuracy', 'test accuracy'], loc='lower right')
+    plt.savefig('accuracyC1.png')
+    plt.ylabel('evolution of accuracy during training')
+    plt.show()
+    print 'max accuracy on test set: ' + str(max(acctests))
+    print "done"

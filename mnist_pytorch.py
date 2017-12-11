@@ -53,7 +53,7 @@ def evaluation(model,N,Xeval,Yeval):
         l, a = loss_accuracy(Ytil, Y_not_onehot, Y)
         loss += l
         acc += a
-        print acc
+        #print acc
     return loss.cpu().data.numpy() / float(k+1), acc.cpu().data.numpy() / float(k+1)
 
 if __name__ == '__main__':
@@ -80,8 +80,9 @@ if __name__ == '__main__':
     # epoch
     Ltrains = []
     Ltests = []
-    acctrains = []
-    acctests =[]
+    acctrains = [0]
+    acctests =[0]
+    
     
     graphic_step = 4096
     iteration = 0
@@ -91,7 +92,7 @@ if __name__ == '__main__':
     Xtrain = Xtrain[perm]
     Ytrain = Ytrain[perm]
     
-    for epoch in range(1):
+    for epoch in range(20):
 
         # batches
         model.train()
@@ -112,31 +113,31 @@ if __name__ == '__main__':
             
             iteration += Nbatch
 
-            if iteration % graphic_step == 0:
-                model.eval()
-                loss_train, acc_train = evaluation(model, N, Xtrain, Ytrain)
-                acctrains.append(acc_train)
-                Ltrains.append(loss_train)
+            #if iteration % graphic_step == 0:
+        model.eval()
+        loss_train, acc_train = evaluation(model, N, Xtrain, Ytrain)
+        acctrains.append(acc_train)
+        Ltrains.append(loss_train)
+
+        loss_test, acc_test = evaluation(model, Ntest, Xtest, Ytest)
+        Ltests.append(loss_test)
+        acctests.append(acc_test)
         
-                loss_test, acc_test = evaluation(model, Ntest, Xtest, Ytest)
-                Ltests.append(loss_test)
-                acctests.append(acc_test)
-                
-                model.train()
+        model.train()
                 
                 
     
-    plt.plot(Ltrains)
-    plt.plot(Ltests)
+    plt.plot(Ltrains,[k+1 for k in range(len(Ltrains))])
+    plt.plot(Ltests,[k+1 for k in range(len(Ltests))])
     plt.ylabel('evolution of Loss during training')
-    plt.xlabel('training iteration number')
-    plt.savefig('loss.png')
+    plt.xlabel('number of training epochs')
+    plt.savefig('lossMNIST.png')
     plt.show()
     plt.plot(acctrains)
     plt.plot(acctests)
-    plt.xlabel('training iteration number')
+    plt.xlabel('number of training epochs')
     plt.legend(['train accuracy', 'test accuracy'], loc='lower right')
-    plt.savefig('accuracy.png')
+    plt.savefig('accuracyMNIST.png')
     plt.ylabel('evolution of accuracy during training')
     plt.show()
     print 'max accuracy on test set: ' + str(max(acctests))

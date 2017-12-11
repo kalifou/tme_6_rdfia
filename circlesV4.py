@@ -4,7 +4,7 @@ Created on Tue Oct 31 14:44:32 2017
 
 @author: rportelas
 """
-from tme6 import MNISTData
+from tme6 import CirclesData
 import torch
 import matplotlib.pyplot as plt
 from torch.autograd import Variable
@@ -32,18 +32,18 @@ def loss_accuracy(Ytil, Y, Y_onehot):
 
 if __name__ == '__main__':
 
-    data = MNISTData()
+    data = CirclesData()
 
     # init
     Xtrain = data.Xtrain
     Ytrain = data.Ytrain
     N = data.Xtrain.shape[0]
-    Nbatch = 32
+    Nbatch = 16
     nx = data.Xtrain.shape[1]
-    nh = 100
+    nh = 10
     ny = data.Ytrain.shape[1]
     
-    model, loss, optim = init_model(nx, nh, ny, 0.02)
+    model, loss, optim = init_model(nx, nh, ny, 0.03)
 
     curves = [[],[], [], []]
 
@@ -53,10 +53,9 @@ if __name__ == '__main__':
     acctrains = []
     acctests =[]
     
-    graphic_step = 1024
     iteration = 0
     
-    for epoch in range(1):
+    for epoch in range(900):
 
         # batches
         model.train()
@@ -75,35 +74,34 @@ if __name__ == '__main__':
             
             iteration += Nbatch
             
-            if iteration % graphic_step == 0:
         
-                model.eval()
-                Ytil_train = model(Variable(data.Xtrain, requires_grad=False))
-                Ytil_test = model(Variable(data.Xtest, requires_grad=False))
-                _, Ytest_not_onehot = torch.max(data.Ytest,1)
-                _, Ytrain_not_onehot = torch.max(data.Ytrain,1)
-                Ltrain, acctrain = loss_accuracy(Ytil_train, Variable(Ytrain_not_onehot, requires_grad=False), Variable(data.Ytrain, requires_grad=False))
-                Ltest, acctest = loss_accuracy(Ytil_test, Variable(Ytest_not_onehot, requires_grad=False), Variable(data.Ytest, requires_grad=False))
-                
-                Ltrains.append(Ltrain.data.numpy())
-                Ltests.append(Ltest.data.numpy())
-                acctrains.append(acctrain.data.numpy())
-                acctests.append(acctest.data.numpy())
+        model.eval()
+        Ytil_train = model(Variable(data.Xtrain, requires_grad=False))
+        Ytil_test = model(Variable(data.Xtest, requires_grad=False))
+        _, Ytest_not_onehot = torch.max(data.Ytest,1)
+        _, Ytrain_not_onehot = torch.max(data.Ytrain,1)
+        Ltrain, acctrain = loss_accuracy(Ytil_train, Variable(Ytrain_not_onehot, requires_grad=False), Variable(data.Ytrain, requires_grad=False))
+        Ltest, acctest = loss_accuracy(Ytil_test, Variable(Ytest_not_onehot, requires_grad=False), Variable(data.Ytest, requires_grad=False))
         
-                model.zero_grad()
-        
+        Ltrains.append(Ltrain.data.numpy())
+        Ltests.append(Ltest.data.numpy())
+        acctrains.append(acctrain.data.numpy())
+        acctests.append(acctest.data.numpy())
+
+        model.zero_grad()
+    
     
     plt.plot(Ltrains)
     plt.plot(Ltests)
     plt.ylabel('evolution of Loss during training')
     plt.xlabel('training iteration number')
-    plt.savefig('loss.png')
+    plt.savefig('lossC4.png')
     plt.show()
     plt.plot(acctrains)
     plt.plot(acctests)
     plt.xlabel('training iteration number')
     plt.legend(['train accuracy', 'test accuracy'], loc='lower right')
-    plt.savefig('accuracy.png')
+    plt.savefig('accuracyC4.png')
     plt.ylabel('evolution of accuracy during training')
     plt.show()
     print 'max accuracy on test set: ' + str(max(acctests))
