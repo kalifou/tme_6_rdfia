@@ -127,8 +127,8 @@ if __name__ == '__main__':
                 
                 
     
-    plt.plot(Ltrains,[k+1 for k in range(len(Ltrains))])
-    plt.plot(Ltests,[k+1 for k in range(len(Ltests))])
+    plt.plot([k+1 for k in range(len(Ltrains))],Ltrains)
+    plt.plot([k+1 for k in range(len(Ltests))],Ltests)
     plt.ylabel('evolution of Loss during training')
     plt.xlabel('number of training epochs')
     plt.savefig('lossMNIST.png')
